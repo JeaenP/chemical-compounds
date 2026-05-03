@@ -4,7 +4,11 @@ export const metadata = {
   title: "Generar Tabla | Chemical Compounds Manager",
 };
 
-export default function GeneratePage() {
+export default function GeneratePage({
+  searchParams,
+}: {
+  searchParams: { tableId?: string };
+}) {
   return (
     <div className="space-y-6">
       <div>
@@ -14,7 +18,7 @@ export default function GeneratePage() {
           matching difuso y exportá a Excel.
         </p>
       </div>
-      <GenerateTable />
+      <GenerateTable initialTableId={searchParams.tableId} />
     </div>
   );
 }

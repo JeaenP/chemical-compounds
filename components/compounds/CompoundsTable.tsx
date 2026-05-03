@@ -9,6 +9,7 @@ import {
   calculateMM,
   validateCFField,
   validateNumericField,
+  type AtomicConstants,
 } from "@/lib/chemistry";
 import type { Compound } from "@/lib/supabase/types";
 import { Input } from "@/components/ui/input";
@@ -147,7 +148,7 @@ export function CompoundsTable() {
       return;
     }
     const parsed = parseCF(cf);
-    const mm = calculateMM(parsed.c, parsed.h, parsed.o, constants);
+    const mm = calculateMM(parsed, constants);
     setSavingId(editingId);
     const { data, error } = await supabase
       .from("compounds")
@@ -182,7 +183,7 @@ export function CompoundsTable() {
       return;
     }
     const parsed = parseCF(cf);
-    const mm = calculateMM(parsed.c, parsed.h, parsed.o, constants);
+    const mm = calculateMM(parsed, constants);
     setSavingNew(true);
     const { data, error } = await supabase
       .from("compounds")
@@ -228,7 +229,7 @@ export function CompoundsTable() {
   const newPreview = useMemo(() => {
     if (!newDraft.cf.trim()) return null;
     const parsed = parseCF(newDraft.cf.trim());
-    const mm = calculateMM(parsed.c, parsed.h, parsed.o, constants);
+    const mm = calculateMM(parsed, constants);
     return {
       type: calculateType(parsed.c, parsed.o),
       c: parsed.c,
@@ -495,7 +496,7 @@ function CompoundRow({
   onSave: () => void;
   onChangeDraft: (d: EditDraft) => void;
   onDelete: () => void;
-  constants: { C: number; H: number; O: number };
+  constants: AtomicConstants;
 }) {
   if (!isEditing || !draft) {
     return (
@@ -578,7 +579,7 @@ function CompoundRow({
   }
 
   const parsed = parseCF(draft.cf);
-  const expectedMM = calculateMM(parsed.c, parsed.h, parsed.o, constants);
+  const expectedMM = calculateMM(parsed, constants);
   const expectedType = calculateType(parsed.c, parsed.o);
   const userC = parseInt(draft.c_count, 10);
   const userH = parseInt(draft.h_count, 10);
@@ -627,7 +628,7 @@ function CompoundRow({
           onChange={(e) => {
             const newCF = e.target.value;
             const np = parseCF(newCF);
-            const newMM = calculateMM(np.c, np.h, np.o, constants);
+            const newMM = calculateMM(np, constants);
             onChangeDraft({
               ...draft,
               cf: newCF,

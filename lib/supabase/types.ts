@@ -1,3 +1,11 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12";
@@ -59,6 +67,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      generated_tables: {
+        Row: {
+          id: string;
+          name: string;
+          rows: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          rows: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          rows?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -74,3 +106,5 @@ export type CompoundUpdate =
   Database["public"]["Tables"]["compounds"]["Update"];
 export type AtomicConstant =
   Database["public"]["Tables"]["atomic_constants"]["Row"];
+export type GeneratedTable =
+  Database["public"]["Tables"]["generated_tables"]["Row"];

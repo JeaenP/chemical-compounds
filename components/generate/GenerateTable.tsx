@@ -1,15 +1,31 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserSupabase } from "@/lib/supabase/client";
-import type { Compound } from "@/lib/supabase/types";
+import type { Compound, Json } from "@/lib/supabase/types";
 import { buildFuse, bestMatch } from "@/lib/fuzzyMatch";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { CompoundSearchCell } from "@/components/generate/CompoundSearchCell";
 import { ExportButton } from "@/components/generate/ExportButton";
 import { toast } from "sonner";
-import { ArrowRightLeft, Eraser, Loader2, Wand2 } from "lucide-react";
+import {
+  Eraser,
+  Loader2,
+  Save,
+  Wand2,
+  PencilLine,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type ResultRow = {
@@ -64,13 +80,30 @@ function rowFromCompound(
   };
 }
 
-export function GenerateTable() {
+export function GenerateTable({
+  initialTableId,
+}: {
+  initialTableId?: string;
+}) {
+  const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const [compounds, setCompounds] = useState<Compound[]>([]);
   const [loadingDB, setLoadingDB] = useState(true);
   const [pasted, setPasted] = useState("");
   const [results, setResults] = useState<ResultRow[]>([]);
   const [processing, setProcessing] = useState(false);
+
+  // Save / load
+  const [currentTableId, setCurrentTableId] = useState<string | null>(
+    initialTableId ?? null,
+  );
+  const [currentTableName, setCurrentTableName] = useState<string | null>(null);
+  const [loadingFromHistory, setLoadingFromHistory] = useState(
+    !!initialTableId,
+  );
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -87,6 +120,30 @@ export function GenerateTable() {
       setCompounds(data ?? []);
     })();
   }, [supabase]);
+
+  // Load saved table if initialTableId is present
+  useEffect(() => {
+    if (!initialTableId) return;
+    (async () => {
+      setLoadingFromHistory(true);
+      const { data, error } = await supabase
+        .from("generated_tables")
+        .select("*")
+        .eq("id", initialTableId)
+        .single();
+      setLoadingFromHistory(false);
+      if (error || !data) {
+        toast.error("No se pudo cargar la tabla guardada");
+        setCurrentTableId(null);
+        setCurrentTableName(null);
+        router.replace("/dashboard/generate");
+        return;
+      }
+      setResults((data.rows as unknown as ResultRow[]) ?? []);
+      setCurrentTableId(data.id);
+      setCurrentTableName(data.name);
+    })();
+  }, [initialTableId, supabase]);
 
   const fuse = useMemo(() => buildFuse(compounds), [compounds]);
 
@@ -105,6 +162,12 @@ export function GenerateTable() {
       return rowFromCompound(idx + 1, name, match);
     });
     setResults(next);
+    // Processing a new list starts a fresh save context
+    if (currentTableId) {
+      setCurrentTableId(null);
+      setCurrentTableName(null);
+      router.replace("/dashboard/generate");
+    }
     setProcessing(false);
     const matched = next.filter((r) => r.matchedFromDB).length;
     toast.success(`Procesados ${next.length} · ${matched} identificados`);
@@ -113,6 +176,11 @@ export function GenerateTable() {
   function clearAll() {
     setResults([]);
     setPasted("");
+    setCurrentTableId(null);
+    setCurrentTableName(null);
+    if (initialTableId) {
+      router.replace("/dashboard/generate");
+    }
   }
 
   function updateRow(index: number, patch: Partial<ResultRow>) {
@@ -139,21 +207,123 @@ export function GenerateTable() {
     );
   }
 
+  // Excel-style paste handler for RIC, %, SD columns.
+  function handlePaste(
+    rowIdx: number,
+    column: "ric" | "percent" | "sd",
+    e: React.ClipboardEvent<HTMLInputElement>,
+  ) {
+    const text = e.clipboardData.getData("text");
+    if (!text) return;
+    // Single-value paste (no newlines): default browser behaviour.
+    if (!/\r|\n/.test(text)) return;
+    e.preventDefault();
+    const values = text.split(/\r?\n/).map((v) => v.trim());
+    setResults((prev) => {
+      const next = [...prev];
+      for (let i = 0; i < values.length; i++) {
+        const targetIdx = rowIdx + i;
+        if (targetIdx >= next.length) break;
+        const v = values[i];
+        if (v === "") continue; // empty → leave unchanged
+        if (column === "percent" || column === "sd") {
+          if (!Number.isFinite(parseFloat(v))) continue;
+        }
+        next[targetIdx] = { ...next[targetIdx], [column]: v };
+      }
+      return next;
+    });
+  }
+
+  async function handleSaveClick() {
+    if (results.length === 0) {
+      toast.error("No hay datos para guardar");
+      return;
+    }
+    if (currentTableId) {
+      // Update existing record
+      setSaving(true);
+      const { error } = await supabase
+        .from("generated_tables")
+        .update({
+          rows: results as unknown as Json,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", currentTableId);
+      setSaving(false);
+      if (error) {
+        toast.error("Error al guardar cambios");
+        return;
+      }
+      toast.success("Tabla guardada correctamente");
+      return;
+    }
+    // New table → ask for name
+    setSaveName("");
+    setSaveDialogOpen(true);
+  }
+
+  async function confirmSaveNew() {
+    const name = saveName.trim();
+    if (!name) {
+      toast.error("Ingresá un nombre para la tabla");
+      return;
+    }
+    setSaving(true);
+    const { data, error } = await supabase
+      .from("generated_tables")
+      .insert({ name, rows: results as unknown as Json })
+      .select()
+      .single();
+    setSaving(false);
+    if (error || !data) {
+      toast.error("Error al guardar la tabla");
+      return;
+    }
+    setCurrentTableId(data.id);
+    setCurrentTableName(data.name);
+    setSaveDialogOpen(false);
+    setSaveName("");
+    toast.success("Tabla guardada correctamente");
+  }
+
   const summaries = useMemo(() => computeSummaries(results), [results]);
+  const isEditing = !!currentTableId;
+
+  if (loadingFromHistory) {
+    return (
+      <div className="rounded-xl border bg-white p-6 shadow-sm space-y-3">
+        <Skeleton className="h-5 w-1/3" />
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {isEditing && currentTableName && (
+        <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+          <PencilLine className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-muted-foreground">Editando:</span>
+          <span className="font-semibold truncate">{currentTableName}</span>
+        </div>
+      )}
+
       {/* Step 1: Paste */}
       <div className="rounded-xl border bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <span className="grid h-7 w-7 place-items-center rounded-md bg-primary/10 text-primary text-sm font-semibold">
             1
           </span>
-          <h2 className="font-semibold">Pegá la lista de compuestos</h2>
+          <h2 className="font-semibold">
+            {isEditing ? "Procesar nueva lista" : "Pegá la lista de compuestos"}
+          </h2>
         </div>
         <p className="text-sm text-muted-foreground mb-3">
-          Un compuesto por línea. El sistema busca el mejor match difuso contra
-          la base.
+          {isEditing
+            ? "Procesar una nueva lista reemplaza los datos actuales y crea una tabla nueva al guardar."
+            : "Un compuesto por línea. El sistema busca el mejor match difuso contra la base."}
         </p>
         <textarea
           value={pasted}
@@ -201,7 +371,21 @@ export function GenerateTable() {
                 {results.length} identificados
               </span>
             </div>
-            <ExportButton rows={results} />
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                onClick={handleSaveClick}
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {isEditing ? "Guardar cambios" : "Guardar tabla"}
+              </Button>
+              <ExportButton rows={results} />
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -269,6 +453,7 @@ export function GenerateTable() {
                         <CellInput
                           value={row.ric}
                           onChange={(v) => updateRow(idx, { ric: v })}
+                          onPaste={(e) => handlePaste(idx, "ric", e)}
                           placeholder=""
                         />
                       </td>
@@ -289,12 +474,14 @@ export function GenerateTable() {
                         <CellInput
                           value={row.percent}
                           onChange={(v) => updateRow(idx, { percent: v })}
+                          onPaste={(e) => handlePaste(idx, "percent", e)}
                         />
                       </td>
                       <td className="px-2 py-1.5">
                         <CellInput
                           value={row.sd}
                           onChange={(v) => updateRow(idx, { sd: v })}
+                          onPaste={(e) => handlePaste(idx, "sd", e)}
                         />
                       </td>
                       <td className="px-2 py-1.5 font-mono text-xs">
@@ -389,6 +576,45 @@ export function GenerateTable() {
           <Skeleton className="h-32 w-full" />
         </div>
       )}
+
+      {/* Save dialog (only for brand-new tables) */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Guardar tabla</DialogTitle>
+            <DialogDescription>
+              Asigná un nombre a esta tabla (por ejemplo, el nombre del
+              artículo o muestra).
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") confirmSaveNew();
+            }}
+            placeholder="Ej: Aceite esencial de orégano - run 1"
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSaveDialogOpen(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={confirmSaveNew} disabled={saving}>
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -455,16 +681,19 @@ function CellInput({
   value,
   onChange,
   placeholder,
+  onPaste,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void;
 }) {
   return (
     <input
       className="cell-input"
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onPaste={onPaste}
       placeholder={placeholder}
     />
   );

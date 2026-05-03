@@ -1,9 +1,16 @@
 /**
- * Parse a chemical formula string like "C4H10O", "C10H16", "C15H24O2".
- * Returns { c, h, o }. Missing element → 0. Element with no number → 1.
+ * Parse a chemical formula string like "C4H10O", "C10H16", "C4H9NO2", "C2H6S".
+ * Returns counts for C, H, O, N, S. Missing element → 0. Element with no number → 1.
  */
-export function parseCF(cf: string): { c: number; h: number; o: number } {
-  if (!cf || typeof cf !== "string") return { c: 0, h: 0, o: 0 };
+export function parseCF(cf: string): {
+  c: number;
+  h: number;
+  o: number;
+  n: number;
+  s: number;
+} {
+  if (!cf || typeof cf !== "string")
+    return { c: 0, h: 0, o: 0, n: 0, s: 0 };
   const clean = cf.replace(/\s+/g, "");
 
   const extract = (symbol: string): number => {
@@ -18,6 +25,8 @@ export function parseCF(cf: string): { c: number; h: number; o: number } {
     c: extract("C"),
     h: extract("H"),
     o: extract("O"),
+    n: extract("N"),
+    s: extract("S"),
   };
 }
 
@@ -35,17 +44,36 @@ export function calculateType(c: number, o: number): string {
   return "OC";
 }
 
+export type AtomCounts = {
+  c: number;
+  h: number;
+  o: number;
+  n: number;
+  s: number;
+};
+
+export type AtomicConstants = {
+  C: number;
+  H: number;
+  O: number;
+  N: number;
+  S: number;
+};
+
 /**
  * Calculate molecular mass (Da) from atom counts and atomic constants.
  * Rounded to 2 decimal places.
  */
 export function calculateMM(
-  c: number,
-  h: number,
-  o: number,
-  constants: { C: number; H: number; O: number },
+  parsed: AtomCounts,
+  constants: AtomicConstants,
 ): number {
-  const mm = c * constants.C + h * constants.H + o * constants.O;
+  const mm =
+    parsed.c * constants.C +
+    parsed.h * constants.H +
+    parsed.o * constants.O +
+    parsed.n * constants.N +
+    parsed.s * constants.S;
   return Math.round(mm * 100) / 100;
 }
 
@@ -75,15 +103,22 @@ export function validateNumericField(
 
 /**
  * Convert an atomic constants list to a keyed object by symbol.
+ * Falls back to standard atomic masses for any symbol missing in the input.
  */
 export function constantsToMap(
   rows: { symbol: string; value: number }[],
-): { C: number; H: number; O: number } {
-  const map = { C: 12.0, H: 1.01, O: 15.99 };
+): AtomicConstants {
+  const map: AtomicConstants = {
+    C: 12.0,
+    H: 1.01,
+    O: 15.99,
+    N: 14.01,
+    S: 32.06,
+  };
   for (const row of rows) {
     const s = row.symbol.toUpperCase();
-    if (s === "C" || s === "H" || s === "O") {
-      map[s as "C" | "H" | "O"] = Number(row.value);
+    if (s === "C" || s === "H" || s === "O" || s === "N" || s === "S") {
+      map[s as keyof AtomicConstants] = Number(row.value);
     }
   }
   return map;

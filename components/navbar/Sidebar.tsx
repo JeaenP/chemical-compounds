@@ -7,6 +7,7 @@ import {
   FlaskConical,
   Beaker,
   TableProperties,
+  Archive,
   LogOut,
   Menu,
   X,
@@ -26,6 +27,11 @@ const NAV = [
     href: "/dashboard/generate",
     label: "Generar Tabla",
     icon: TableProperties,
+  },
+  {
+    href: "/dashboard/saved-tables",
+    label: "Tablas Guardadas",
+    icon: Archive,
   },
 ];
 

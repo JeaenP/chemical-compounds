@@ -11,9 +11,11 @@ CREATE TABLE IF NOT EXISTS atomic_constants (
 );
 
 INSERT INTO atomic_constants (symbol, value) VALUES
-  ('C', 12.00),
-  ('H',  1.01),
-  ('O', 15.99)
+  ('C', 12.0107),
+  ('H',  1.00794),
+  ('O', 15.9994),
+  ('N', 14.0067),
+  ('S', 32.065)
 ON CONFLICT (symbol) DO UPDATE SET value = EXCLUDED.value;
 
 -- Compounds -----------------------------------------------------------------
@@ -43,9 +45,37 @@ CREATE TABLE IF NOT EXISTS compounds (
 CREATE INDEX IF NOT EXISTS compounds_compound_idx ON compounds (compound);
 CREATE INDEX IF NOT EXISTS compounds_rir_idx ON compounds (rir);
 
+-- Generated tables (saved table history) ------------------------------------
+CREATE TABLE IF NOT EXISTS generated_tables (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  rows        JSONB NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS generated_tables_updated_idx
+  ON generated_tables (updated_at DESC);
+
+-- Auto-update updated_at on row UPDATE
+CREATE OR REPLACE FUNCTION set_generated_tables_updated_at()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS generated_tables_set_updated_at ON generated_tables;
+CREATE TRIGGER generated_tables_set_updated_at
+  BEFORE UPDATE ON generated_tables
+  FOR EACH ROW
+  EXECUTE FUNCTION set_generated_tables_updated_at();
+
 -- Row Level Security --------------------------------------------------------
-ALTER TABLE atomic_constants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE compounds        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE atomic_constants  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE compounds         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE generated_tables  ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "authenticated read constants" ON atomic_constants;
 CREATE POLICY "authenticated read constants" ON atomic_constants
@@ -55,9 +85,15 @@ DROP POLICY IF EXISTS "authenticated all compounds" ON compounds;
 CREATE POLICY "authenticated all compounds" ON compounds
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "authenticated all generated_tables" ON generated_tables;
+CREATE POLICY "authenticated all generated_tables" ON generated_tables
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 -- ============================================================================
 -- Sample insert pattern (your CSV import follows the same shape):
 --   INSERT INTO compounds (compound, rir, cf, c_count, h_count, o_count, mm_da)
 --   VALUES ('Ethyl ether', 529, 'C4H10O', 4, 10, 1, 74.07);
 -- The `type` column is generated automatically — never pass it on insert.
+-- Note: c_count/h_count/o_count are stored, but parseCF() also extracts N and S
+-- which are used by calculateMM() at compute time only.
 -- ============================================================================
