@@ -34,6 +34,7 @@ import {
   Pencil,
   Plus,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +87,11 @@ export function CompoundsTable() {
     cf: "",
   });
   const [savingNew, setSavingNew] = useState(false);
+
+  // TEMPORARY BUTTON - comment out after use
+  // const [recalculating, setRecalculating] = useState(false);
+  // const [recalcDone, setRecalcDone] = useState(0);
+  // const [recalcTotal, setRecalcTotal] = useState(0);
 
   // Debounce search
   useEffect(() => {
@@ -225,6 +231,63 @@ export function CompoundsTable() {
     setDeleteTarget(null);
   }
 
+  // TEMPORARY BUTTON - comment out after use
+  /*
+  async function recalculateAll() {
+    if (recalculating) return;
+    setRecalculating(true);
+    setRecalcDone(0);
+    setRecalcTotal(0);
+    try {
+      const { data: all, error } = await supabase
+        .from("compounds")
+        .select("*")
+        .order("id", { ascending: true });
+      if (error || !all) {
+        toast.error("Error cargando compuestos");
+        return;
+      }
+      setRecalcTotal(all.length);
+
+      const BATCH = 50;
+      let processed = 0;
+      let failed = 0;
+
+      for (let i = 0; i < all.length; i += BATCH) {
+        const batch = all.slice(i, i + BATCH);
+        const results = await Promise.all(
+          batch.map(async (c) => {
+            const parsed = parseCF(c.cf);
+            const mm = calculateMM(parsed, constants);
+            const { error: upErr } = await supabase
+              .from("compounds")
+              .update({
+                c_count: parsed.c,
+                h_count: parsed.h,
+                o_count: parsed.o,
+                mm_da: mm,
+              })
+              .eq("id", c.id);
+            return !upErr;
+          }),
+        );
+        processed += results.length;
+        failed += results.filter((ok) => !ok).length;
+        setRecalcDone(processed);
+      }
+
+      if (failed > 0) {
+        toast.error(`Procesados ${processed}, ${failed} fallaron`);
+      } else {
+        toast.success("Todos los compuestos actualizados correctamente");
+      }
+      await fetchAll();
+    } finally {
+      setRecalculating(false);
+    }
+  }
+  */
+
   // Live preview values for the new-row inputs
   const newPreview = useMemo(() => {
     if (!newDraft.cf.trim()) return null;
@@ -260,14 +323,37 @@ export function CompoundsTable() {
             </span>
           )}
         </div>
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre o CN…"
-            className="pl-9"
-          />
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          {/* TEMPORARY BUTTON - comment out after use */}
+          {/*
+          <Button
+            variant="outline"
+            onClick={recalculateAll}
+            disabled={recalculating || loading}
+            className="border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900 hover:border-amber-500 shrink-0"
+          >
+            {recalculating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Actualizando {recalcDone}/{recalcTotal}...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4" />
+                Recalcular todos los compuestos
+              </>
+            )}
+          </Button>
+          */}
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nombre o CN…"
+              className="pl-9"
+            />
+          </div>
         </div>
       </div>
 
