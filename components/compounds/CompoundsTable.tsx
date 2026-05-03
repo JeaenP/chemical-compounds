@@ -293,8 +293,10 @@ export function CompoundsTable() {
     if (!newDraft.cf.trim()) return null;
     const parsed = parseCF(newDraft.cf.trim());
     const mm = calculateMM(parsed, constants);
+    console.log(parsed.c + " ---- " +  parsed.o)
     return {
       type: calculateType(parsed.c, parsed.o),
+    
       c: parsed.c,
       h: parsed.h,
       o: parsed.o,

@@ -35,12 +35,17 @@ export function parseCF(cf: string): {
  * Order matters — first matching rule wins.
  */
 export function calculateType(c: number, o: number): string {
+  console.log("C ES:" + c + " O ES:"  + o)
   if (c === 10 && o === 0) return "MH";
   if (c === 10 && o > 0) return "OM";
   if (c === 15 && o === 0) return "SH";
   if (c === 15 && o > 0) return "OS";
   if (c === 20 && o === 0) return "DH";
   if (c === 20 && o > 0) return "OD";
+  if (c === 25 && o === 0) return "EH";
+  if (c === 25 && o > 0) return "OE";
+  if (c === 30 && o === 0) return "TH";
+  if (c === 30 && o > 0) return "OT";
   return "OC";
 }
 

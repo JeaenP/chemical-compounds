@@ -25,6 +25,10 @@ import {
   Save,
   Wand2,
   PencilLine,
+  MoreVertical,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -104,6 +108,21 @@ export function GenerateTable({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Row-options menu (open at most one at a time)
+  const [openMenuIdx, setOpenMenuIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (openMenuIdx === null) return;
+    function onDocClick(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest("[data-row-menu]")) {
+        setOpenMenuIdx(null);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [openMenuIdx]);
 
   useEffect(() => {
     (async () => {
@@ -194,16 +213,86 @@ export function GenerateTable({
       prev.map((r, i) =>
         i === index
           ? {
-              ...r,
-              compound: match.compound,
-              rir: match.rir,
-              type: match.type,
-              cf: match.cf,
-              mm_da: Number(match.mm_da),
-              matchedFromDB: true,
-            }
+            ...r,
+            compound: match.compound,
+            rir: match.rir,
+            type: match.type,
+            cf: match.cf,
+            mm_da: Number(match.mm_da),
+            matchedFromDB: true,
+          }
           : r,
       ),
+    );
+  }
+
+  function emptyRow(cn: number): ResultRow {
+    return {
+      cn,
+      rt: "",
+      compound: "",
+      ric: "",
+      rir: "",
+      percent: "",
+      sd: "",
+      type: "",
+      cf: "",
+      mm_da: "",
+      originalInput: "",
+      matchedFromDB: false,
+    };
+  }
+
+  function renumber(rows: ResultRow[]): ResultRow[] {
+    return rows.map((r, i) => ({ ...r, cn: i + 1 }));
+  }
+
+  function insertRow(at: number) {
+    setResults((prev) => {
+      const next = [...prev];
+      next.splice(at, 0, emptyRow(0));
+      return renumber(next);
+    });
+    setOpenMenuIdx(null);
+  }
+
+  function deleteRow(at: number) {
+    setResults((prev) => renumber(prev.filter((_, i) => i !== at)));
+    setOpenMenuIdx(null);
+  }
+
+  // Editing Original Name re-runs the fuzzy match, mirroring how the initial
+  // paste flow assigns rows. If matched, fills the DB-derived fields; if not,
+  // clears them so user knows nothing is associated. RT/RIC/%/SD stay intact.
+  function changeOriginalName(idx: number, text: string) {
+    const trimmed = text.trim();
+    const match = trimmed ? bestMatch(fuse, trimmed, 0.5) : null;
+    setResults((prev) =>
+      prev.map((r, i) => {
+        if (i !== idx) return r;
+        if (match) {
+          return {
+            ...r,
+            originalInput: text,
+            compound: match.compound,
+            rir: match.rir,
+            type: match.type,
+            cf: match.cf,
+            mm_da: Number(match.mm_da),
+            matchedFromDB: true,
+          };
+        }
+        return {
+          ...r,
+          originalInput: text,
+          compound: "",
+          rir: "",
+          type: "",
+          cf: "",
+          mm_da: "",
+          matchedFromDB: false,
+        };
+      }),
     );
   }
 
@@ -392,6 +481,7 @@ export function GenerateTable({
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b">
                 <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th className="px-1 py-2.5 w-8" aria-label="Acciones"></th>
                   <th className="px-3 py-2.5 min-w-[180px]">Original Name</th>
                   <th className="px-3 py-2.5 w-14">CN</th>
                   <th className="px-3 py-2.5 w-20">RT</th>
@@ -416,15 +506,64 @@ export function GenerateTable({
                     <tr
                       key={idx}
                       className={cn(
-                        "transition-colors",
+                        "group transition-colors",
                         !row.matchedFromDB && "bg-amber-50/40",
                       )}
                     >
                       <td
-                        className="px-3 py-2 text-xs text-muted-foreground italic truncate max-w-[220px]"
-                        title={row.originalInput}
+                        className="px-1 py-1 align-middle relative w-8"
+                        data-row-menu
                       >
-                        {row.originalInput}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenMenuIdx(openMenuIdx === idx ? null : idx)
+                          }
+                          aria-label="Opciones de fila"
+                          className={cn(
+                            "grid h-6 w-6 place-items-center rounded text-muted-foreground transition hover:bg-accent hover:text-foreground focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            openMenuIdx === idx
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100",
+                          )}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                        {openMenuIdx === idx && (
+                          <div className="absolute left-1 top-8 z-30 min-w-[180px] rounded-md border bg-popover py-1 text-sm shadow-lg animate-fade-in">
+                            <button
+                              type="button"
+                              onClick={() => insertRow(idx)}
+                              className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent"
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                              Insertar fila arriba
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => insertRow(idx + 1)}
+                              className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent"
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                              Insertar fila abajo
+                            </button>
+                            <div className="my-1 h-px bg-border" />
+                            <button
+                              type="button"
+                              onClick={() => deleteRow(idx)}
+                              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Eliminar fila
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 max-w-[220px]">
+                        <OriginalNameInput
+                          value={row.originalInput}
+                          onCommit={(text) => changeOriginalName(idx, text)}
+                        />
                       </td>
                       <td className="px-3 py-2 text-muted-foreground tabular-nums">
                         {row.cn}
@@ -516,7 +655,8 @@ export function GenerateTable({
                       <td
                         className={cn(
                           "px-3 py-2 tabular-nums text-xs",
-                          val1 !== null && val1 < 0 && "bg-destructive/15 text-destructive font-medium",
+                          val1 !== null && Math.abs(val1) > 10 && "bg-destructive/15 text-destructive font-medium",
+                          val1 !== null && Math.abs(val1) > 5 && Math.abs(val1) <= 10 && "bg-yellow-100 text-yellow-800 font-medium",
                         )}
                       >
                         {val1 === null ? "" : val1}
@@ -535,13 +675,14 @@ export function GenerateTable({
                 {summaries.length > 0 && (
                   <>
                     <tr aria-hidden="true">
-                      <td colSpan={13} className="py-2 bg-slate-50/40"></td>
+                      <td colSpan={14} className="py-2 bg-slate-50/40"></td>
                     </tr>
                     {summaries.map((s, i) => (
                       <tr
                         key={`sum-${i}`}
                         className="bg-slate-50 font-medium"
                       >
+                        <td className="px-1 py-2"></td>
                         <td className="px-3 py-2"></td>
                         <td className="px-3 py-2"></td>
                         <td className="px-3 py-2"></td>
@@ -625,6 +766,10 @@ export const SUMMARY_CATEGORIES: ReadonlyArray<{ code: string; label: string }> 
   { code: "SH", label: "Sesquiterpene hydrocarbons (SH)" },
   { code: "OS", label: "Oxygenated sesquiterpene (OS)" },
   { code: "OC", label: "Other compounds (OC)" },
+  { code: "EH", label: "Sesterterpene hydrocarbons (EH)" },
+  { code: "OE", label: "Oxygenated sesterterpenes (OE)" },
+  { code: "TH", label: "Triterpene hydrocarbons (TH)" },
+  { code: "OT", label: "Oxygenated triterpenes (OT)" },
 ];
 
 export type SummaryEntry = { label: string; sum: number };
@@ -695,6 +840,46 @@ function CellInput({
       onChange={(e) => onChange(e.target.value)}
       onPaste={onPaste}
       placeholder={placeholder}
+    />
+  );
+}
+
+// Original Name input: edits with a draft buffer and only triggers fuzzy
+// re-match on blur or Enter — avoids re-running the matcher on every keystroke.
+function OriginalNameInput({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (text: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function commit() {
+    if (draft !== value) onCommit(draft);
+  }
+
+  return (
+    <input
+      className="cell-input italic text-xs text-muted-foreground"
+      value={draft}
+      placeholder="Pegar nombre original…"
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          (e.currentTarget as HTMLInputElement).blur();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          setDraft(value);
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+      }}
     />
   );
 }
