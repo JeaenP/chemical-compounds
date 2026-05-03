@@ -143,7 +143,7 @@ export function GenerateTable({
       setCurrentTableId(data.id);
       setCurrentTableName(data.name);
     })();
-  }, [initialTableId, supabase]);
+  }, [initialTableId, supabase, router]);
 
   const fuse = useMemo(() => buildFuse(compounds), [compounds]);
 

@@ -87,7 +87,7 @@ export function SavedTablesList() {
             >
               Generar Tabla
             </Link>{" "}
-            y guardala con el botón "Guardar tabla".
+            y guardala con el botón &quot;Guardar tabla&quot;.
           </p>
         </div>
       ) : (
