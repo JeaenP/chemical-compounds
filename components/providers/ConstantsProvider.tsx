@@ -16,7 +16,11 @@ export function ConstantsProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase
         .from("atomic_constants")
         .select("symbol, value");
-      if (error || !data) return;
+      if (error || !data) {
+        console.error("Error cargando constantes:", error);
+        return;
+      }
+      console.log("Constantes cargadas:", data);
       setConstants(constantsToMap(data));
     })();
   }, [loaded, setConstants]);

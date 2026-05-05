@@ -9,11 +9,11 @@ type ConstantsState = AtomicConstants & {
 };
 
 export const useConstants = create<ConstantsState>((set) => ({
-  C: 12.0,
-  H: 1.01,
-  O: 15.99,
-  N: 14.01,
-  S: 32.06,
+  C: 0,
+  H: 0,
+  O: 0,
+  N: 0,
+  S: 0,
   loaded: false,
   setConstants: ({ C, H, O, N, S }) =>
     set({ C, H, O, N, S, loaded: true }),

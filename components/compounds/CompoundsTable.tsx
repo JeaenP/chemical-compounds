@@ -66,6 +66,7 @@ function compoundToDraft(c: Compound): EditDraft {
 
 export function CompoundsTable() {
   const constants = useConstants();
+
   const supabase = useMemo(() => createBrowserSupabase(), []);
 
   const [rows, setRows] = useState<Compound[]>([]);
@@ -308,6 +309,13 @@ export function CompoundsTable() {
     !!newDraft.compound.trim() &&
     !!newDraft.cf.trim() &&
     !Number.isNaN(parseInt(newDraft.rir, 10));
+
+
+  if (!constants.loaded) return (
+    <div className="flex items-center justify-center py-20 text-muted-foreground">
+      Cargando...
+    </div>
+  );
 
   return (
     <div className="space-y-4">
