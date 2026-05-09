@@ -23,6 +23,9 @@ export type Database = {
           h_count: number;
           o_count: number;
           mm_da: number;
+          cas: string | null;
+          ki: number | null;
+          fw: number | null;
           created_at: string;
         };
         Insert: {
@@ -34,6 +37,9 @@ export type Database = {
           h_count: number;
           o_count: number;
           mm_da: number;
+          cas?: string | null;
+          ki?: number | null;
+          fw?: number | null;
           created_at?: string;
         };
         Update: {
@@ -45,6 +51,9 @@ export type Database = {
           h_count?: number;
           o_count?: number;
           mm_da?: number;
+          cas?: string | null;
+          ki?: number | null;
+          fw?: number | null;
           created_at?: string;
         };
         Relationships: [];

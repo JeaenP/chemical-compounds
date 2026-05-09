@@ -47,6 +47,9 @@ type EditDraft = {
   h_count: string;
   o_count: string;
   mm_da: string;
+  cas: string;
+  ki: string;
+  fw: string;
 };
 
 const PAGE_SIZE = 50;
@@ -61,7 +64,29 @@ function compoundToDraft(c: Compound): EditDraft {
     h_count: String(c.h_count),
     o_count: String(c.o_count),
     mm_da: String(c.mm_da),
+    cas: c.cas ?? "",
+    ki: c.ki != null ? String(c.ki) : "",
+    fw: c.fw != null ? String(c.fw) : "",
   };
+}
+
+function trimOrNull(s: string): string | null {
+  const t = s.trim();
+  return t === "" ? null : t;
+}
+
+function intOrNull(s: string): number | null {
+  const t = s.trim();
+  if (t === "") return null;
+  const n = parseInt(t, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function floatOrNull(s: string): number | null {
+  const t = s.trim();
+  if (t === "") return null;
+  const n = parseFloat(t);
+  return Number.isFinite(n) ? n : null;
 }
 
 export function CompoundsTable() {
@@ -86,13 +111,17 @@ export function CompoundsTable() {
     compound: "",
     rir: "",
     cf: "",
+    cas: "",
+    ki: "",
+    fw: "",
   });
   const [savingNew, setSavingNew] = useState(false);
 
   // TEMPORARY BUTTON - comment out after use
-  // const [recalculating, setRecalculating] = useState(false);
-  // const [recalcDone, setRecalcDone] = useState(0);
-  // const [recalcTotal, setRecalcTotal] = useState(0);
+  const SHOW_RECALCULATE_BUTTON = false; 
+   const [recalculating, setRecalculating] = useState(false);
+   const [recalcDone, setRecalcDone] = useState(0);
+   const [recalcTotal, setRecalcTotal] = useState(0);
 
   // Debounce search
   useEffect(() => {
@@ -115,6 +144,7 @@ export function CompoundsTable() {
       toast.error("Error cargando compuestos");
       return;
     }
+    console.log("data es " + data.length)
     setRows(data ?? []);
   }
 
@@ -129,6 +159,7 @@ export function CompoundsTable() {
     return rows.filter((r) => {
       if (String(r.id).includes(q)) return true;
       if (r.compound.toLowerCase().includes(q)) return true;
+      if (r.cas && r.cas.toLowerCase().includes(q)) return true;
       return false;
     });
   }, [rows, debouncedSearch]);
@@ -167,6 +198,9 @@ export function CompoundsTable() {
         h_count: parsed.h,
         o_count: parsed.o,
         mm_da: mm,
+        cas: trimOrNull(editDraft.cas),
+        ki: intOrNull(editDraft.ki),
+        fw: floatOrNull(editDraft.fw),
       })
       .eq("id", editingId)
       .select()
@@ -202,6 +236,9 @@ export function CompoundsTable() {
         h_count: parsed.h,
         o_count: parsed.o,
         mm_da: mm,
+        cas: trimOrNull(newDraft.cas),
+        ki: intOrNull(newDraft.ki),
+        fw: floatOrNull(newDraft.fw),
       })
       .select()
       .single();
@@ -211,7 +248,7 @@ export function CompoundsTable() {
       return;
     }
     setRows((prev) => [...prev, data]);
-    setNewDraft({ compound: "", rir: "", cf: "" });
+    setNewDraft({ compound: "", rir: "", cf: "", cas: "", ki: "", fw: "" });
     toast.success(`Compuesto #${data.id} agregado`);
   }
 
@@ -233,7 +270,7 @@ export function CompoundsTable() {
   }
 
   // TEMPORARY BUTTON - comment out after use
-  /*
+  
   async function recalculateAll() {
     if (recalculating) return;
     setRecalculating(true);
@@ -287,7 +324,7 @@ export function CompoundsTable() {
       setRecalculating(false);
     }
   }
-  */
+  
 
   // Live preview values for the new-row inputs
   const newPreview = useMemo(() => {
@@ -335,7 +372,7 @@ export function CompoundsTable() {
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           {/* TEMPORARY BUTTON - comment out after use */}
-          {/*
+          {SHOW_RECALCULATE_BUTTON && (
           <Button
             variant="outline"
             onClick={recalculateAll}
@@ -354,7 +391,7 @@ export function CompoundsTable() {
               </>
             )}
           </Button>
-          */}
+          )}
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
@@ -382,6 +419,9 @@ export function CompoundsTable() {
                 <th className="px-3 py-3 w-16">H</th>
                 <th className="px-3 py-3 w-16">O</th>
                 <th className="px-3 py-3 w-28">MM (Da)</th>
+                <th className="px-3 py-3 w-28">CAS#</th>
+                <th className="px-3 py-3 w-20">KI</th>
+                <th className="px-3 py-3 w-24">FW</th>
                 <th className="px-3 py-3 w-24 text-right">Acciones</th>
               </tr>
             </thead>
@@ -389,7 +429,7 @@ export function CompoundsTable() {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 10 }).map((__, j) => (
+                    {Array.from({ length: 13 }).map((__, j) => (
                       <td key={j} className="px-3 py-3">
                         <Skeleton className="h-5 w-full" />
                       </td>
@@ -399,7 +439,7 @@ export function CompoundsTable() {
               ) : pageRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={13}
                     className="px-3 py-10 text-center text-muted-foreground text-sm"
                   >
                     {debouncedSearch
@@ -484,6 +524,47 @@ export function CompoundsTable() {
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">
                   {newPreview?.mm ?? "—"}
+                </td>
+                <td className="px-2 py-2">
+                  <Input
+                    value={newDraft.cas}
+                    onChange={(e) =>
+                      setNewDraft({ ...newDraft, cas: e.target.value })
+                    }
+                    placeholder="CAS#"
+                    className="h-9 font-mono text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && canSaveNew) saveNew();
+                    }}
+                  />
+                </td>
+                <td className="px-2 py-2">
+                  <Input
+                    value={newDraft.ki}
+                    onChange={(e) =>
+                      setNewDraft({ ...newDraft, ki: e.target.value })
+                    }
+                    placeholder="KI"
+                    inputMode="numeric"
+                    className="h-9 tabular-nums"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && canSaveNew) saveNew();
+                    }}
+                  />
+                </td>
+                <td className="px-2 py-2">
+                  <Input
+                    value={newDraft.fw}
+                    onChange={(e) =>
+                      setNewDraft({ ...newDraft, fw: e.target.value })
+                    }
+                    placeholder="FW"
+                    inputMode="numeric"
+                    className="h-9 tabular-nums"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && canSaveNew) saveNew();
+                    }}
+                  />
                 </td>
                 <td className="px-3 py-2 text-right">
                   {canSaveNew && (
@@ -648,6 +729,24 @@ function CompoundRow({
         >
           {Number(row.mm_da).toFixed(2)}
         </td>
+        <td
+          className="px-3 py-2.5 font-mono text-xs cursor-pointer"
+          onClick={onStartEdit}
+        >
+          {row.cas ?? <span className="text-muted-foreground">—</span>}
+        </td>
+        <td
+          className="px-3 py-2.5 tabular-nums cursor-pointer"
+          onClick={onStartEdit}
+        >
+          {row.ki ?? <span className="text-muted-foreground">—</span>}
+        </td>
+        <td
+          className="px-3 py-2.5 tabular-nums cursor-pointer"
+          onClick={onStartEdit}
+        >
+          {row.fw ?? <span className="text-muted-foreground">—</span>}
+        </td>
         <td className="px-3 py-2.5 text-right">
           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button
@@ -794,6 +893,41 @@ function CompoundRow({
           value={draft.mm_da}
           inputMode="decimal"
           onChange={(e) => onChangeDraft({ ...draft, mm_da: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSave();
+            if (e.key === "Escape") onCancel();
+          }}
+        />
+      </td>
+      <td className="px-2 py-2">
+        <input
+          className="cell-input font-mono text-xs"
+          value={draft.cas}
+          onChange={(e) => onChangeDraft({ ...draft, cas: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSave();
+            if (e.key === "Escape") onCancel();
+          }}
+        />
+      </td>
+      <td className="px-2 py-2">
+        <input
+          className="cell-input tabular-nums"
+          value={draft.ki}
+          inputMode="numeric"
+          onChange={(e) => onChangeDraft({ ...draft, ki: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSave();
+            if (e.key === "Escape") onCancel();
+          }}
+        />
+      </td>
+      <td className="px-2 py-2">
+        <input
+          className="cell-input tabular-nums"
+          value={draft.fw}
+          inputMode="numeric"
+          onChange={(e) => onChangeDraft({ ...draft, fw: e.target.value })}
           onKeyDown={(e) => {
             if (e.key === "Enter") onSave();
             if (e.key === "Escape") onCancel();
