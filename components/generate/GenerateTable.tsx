@@ -795,12 +795,13 @@ export const SUMMARY_CATEGORIES: ReadonlyArray<{ code: string; label: string }> 
   { code: "OM", label: "Oxygenated monoterpenes (OM)" },
   { code: "SH", label: "Sesquiterpene hydrocarbons (SH)" },
   { code: "OS", label: "Oxygenated sesquiterpene (OS)" },
-  { code: "OC", label: "Other compounds (OC)" },
   { code: "EH", label: "Sesterterpene hydrocarbons (EH)" },
   { code: "OE", label: "Oxygenated sesterterpenes (OE)" },
   { code: "TH", label: "Triterpene hydrocarbons (TH)" },
   { code: "OT", label: "Oxygenated triterpenes (OT)" },
+  { code: "OC", label: "Other compounds (OC)" },
 ];
+
 
 export type SummaryEntry = { label: string; sum: number };
 
