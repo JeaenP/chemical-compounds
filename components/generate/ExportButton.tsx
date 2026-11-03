@@ -11,6 +11,8 @@ const HEADERS = [
   "CN",
   "RT",
   "Compound",
+  "KIC",
+  "KIR",
   "RIC",
   "RIR",
   "%",
@@ -42,6 +44,8 @@ function rowToValues(
     row.cn,
     row.rt,
     row.compound,
+    row.kic ?? "",
+    row.kir ?? "",
     row.ric,
     row.rir === "" ? "" : row.rir,
     row.percent,
@@ -53,6 +57,10 @@ function rowToValues(
     val2,
   ];
 }
+
+const TOTAL_COLS = HEADERS.length; // 14
+const COMPOUND_COL = 3;
+const PERCENT_COL = 8;
 
 export function ExportButton({ rows }: { rows: ResultRow[] }) {
   const [loading, setLoading] = useState(false);
@@ -95,43 +103,30 @@ export function ExportButton({ rows }: { rows: ResultRow[] }) {
         });
       });
 
-      // Summary rows (label under Compound, sum under %)
+      // Summary rows (label under Compound, sum under %) - always all rows
       const summaries = computeSummaries(rows);
-      if (summaries.length > 0) {
-        ws.addRow([]); // blank separator
-        summaries.forEach((s) => {
-          const values: Array<string | number> = [
-            "",
-            "",
-            s.label,
-            "",
-            "",
-            s.sum,
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-          ];
-          const r = ws.addRow(values);
-          for (let col = 1; col <= 12; col++) {
-            r.getCell(col).font = {
-              name: "Palatino Linotype",
-              size: 10,
-            };
-          }
-          // Bottom border from Compound (col 3) through % (col 6)
-          for (let col = 3; col <= 6; col++) {
-            r.getCell(col).border = {
-              bottom: { style: "thin" },
-            };
-          }
-        });
-      }
+      ws.addRow([]); // blank separator
+      summaries.forEach((s) => {
+        const values: Array<string | number> = new Array(TOTAL_COLS).fill("");
+        values[COMPOUND_COL - 1] = s.label;
+        values[PERCENT_COL - 1] = s.sum;
+        const r = ws.addRow(values);
+        for (let col = 1; col <= TOTAL_COLS; col++) {
+          r.getCell(col).font = {
+            name: "Palatino Linotype",
+            size: 10,
+          };
+        }
+        // Bottom border from Compound through %
+        for (let col = COMPOUND_COL; col <= PERCENT_COL; col++) {
+          r.getCell(col).border = {
+            bottom: { style: "thin" },
+          };
+        }
+      });
 
       // Approximate column widths
-      const widths = [6, 8, 36, 10, 10, 8, 8, 8, 14, 12, 8, 8];
+      const widths = [6, 8, 36, 10, 10, 10, 10, 8, 8, 8, 14, 12, 8, 8];
       ws.columns.forEach((col, i) => {
         col.width = widths[i] ?? 12;
       });

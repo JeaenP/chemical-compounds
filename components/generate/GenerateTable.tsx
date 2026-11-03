@@ -36,6 +36,8 @@ export type ResultRow = {
   cn: number;
   rt: string;
   compound: string;
+  kic: string;                      // NUEVO
+  kir: number | "#N/D" | "";        // NUEVO
   ric: string;
   rir: number | "#N/D" | "";
   percent: string;
@@ -57,6 +59,8 @@ function rowFromCompound(
       cn,
       rt: "",
       compound: "#N/D",
+      kic: "",
+      kir: "#N/D",
       ric: "",
       rir: "#N/D",
       percent: "",
@@ -72,6 +76,8 @@ function rowFromCompound(
     cn,
     rt: "",
     compound: match.compound,
+    kic: "",
+    kir: match.ki ?? "",
     ric: "",
     rir: match.rir,
     percent: "",
@@ -215,6 +221,7 @@ export function GenerateTable({
           ? {
             ...r,
             compound: match.compound,
+            kir: match.ki ?? "",
             rir: match.rir,
             type: match.type,
             cf: match.cf,
@@ -231,6 +238,8 @@ export function GenerateTable({
       cn,
       rt: "",
       compound: "",
+      kic: "", 
+      kir: "",
       ric: "",
       rir: "",
       percent: "",
@@ -275,6 +284,7 @@ export function GenerateTable({
             ...r,
             originalInput: text,
             compound: match.compound,
+            kir: match.ki ?? "",
             rir: match.rir,
             type: match.type,
             cf: match.cf,
@@ -286,6 +296,7 @@ export function GenerateTable({
           ...r,
           originalInput: text,
           compound: "",
+          kir: "",
           rir: "",
           type: "",
           cf: "",
@@ -299,7 +310,7 @@ export function GenerateTable({
   // Excel-style paste handler for RIC, %, SD columns.
   function handlePaste(
     rowIdx: number,
-    column: "ric" | "percent" | "sd",
+    column: "kic" | "ric" | "percent" | "sd",
     e: React.ClipboardEvent<HTMLInputElement>,
   ) {
     const text = e.clipboardData.getData("text");
@@ -486,6 +497,8 @@ export function GenerateTable({
                   <th className="px-3 py-2.5 w-14">CN</th>
                   <th className="px-3 py-2.5 w-20">RT</th>
                   <th className="px-3 py-2.5 min-w-[220px]">Compound</th>
+                  <th className="px-3 py-2.5 w-24">KIC</th>
+                  <th className="px-3 py-2.5 w-24">KIR</th>
                   <th className="px-3 py-2.5 w-24">RIC</th>
                   <th className="px-3 py-2.5 w-24">RIR</th>
                   <th className="px-3 py-2.5 w-20">%</th>
@@ -590,6 +603,23 @@ export function GenerateTable({
                       </td>
                       <td className="px-2 py-1.5">
                         <CellInput
+                          value={row.kic ?? ""}
+                          onChange={(v) => updateRow(idx, { kic: v })}
+                          onPaste={(e) => handlePaste(idx, "kic", e)}
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 tabular-nums">
+                        <CellInput
+                          value={row.kir === "#N/D" ? "#N/D" : String(row.kir ?? "")}
+                          onChange={(v) =>
+                            updateRow(idx, {
+                              kir: v === "#N/D" || v === "" ? (v as "#N/D" | "") : Number(v),
+                            })
+                          }
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <CellInput
                           value={row.ric}
                           onChange={(v) => updateRow(idx, { ric: v })}
                           onPaste={(e) => handlePaste(idx, "ric", e)}
@@ -675,7 +705,7 @@ export function GenerateTable({
                 {summaries.length > 0 && (
                   <>
                     <tr aria-hidden="true">
-                      <td colSpan={14} className="py-2 bg-slate-50/40"></td>
+                      <td colSpan={16} className="py-2 bg-slate-50/40"></td>
                     </tr>
                     {summaries.map((s, i) => (
                       <tr
@@ -779,30 +809,20 @@ export function computeSummaries(rows: ResultRow[]): SummaryEntry[] {
 
   for (const cat of SUMMARY_CATEGORIES) {
     let sum = 0;
-    let hasRows = false;
     for (const row of rows) {
       if (row.type !== cat.code) continue;
       const p = parseFloat(row.percent);
-      if (!Number.isFinite(p)) continue;
-      sum += p;
-      hasRows = true;
+      if (Number.isFinite(p)) sum += p;
     }
-    if (hasRows) {
-      out.push({ label: cat.label, sum: Math.round(sum * 100) / 100 });
-    }
+    out.push({ label: cat.label, sum: Math.round(sum * 100) / 100 });
   }
 
   let total = 0;
-  let hasAny = false;
   for (const row of rows) {
     const p = parseFloat(row.percent);
-    if (!Number.isFinite(p)) continue;
-    total += p;
-    hasAny = true;
+    if (Number.isFinite(p)) total += p;
   }
-  if (hasAny) {
-    out.push({ label: "Total identified", sum: Math.round(total * 100) / 100 });
-  }
+  out.push({ label: "Total identified", sum: Math.round(total * 100) / 100 });
 
   return out;
 }
